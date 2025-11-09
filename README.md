@@ -200,10 +200,6 @@ flake8 src/ tests/
 mypy src/
 ```
 
-## 🤝 Contributing
-
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
 ## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
@@ -212,11 +208,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 This software is for educational purposes only. Cryptocurrency trading carries significant risk. Never trade with money you cannot afford to lose. Always test strategies thoroughly on testnet before considering live deployment.
 
-## 📞 Support
-
-For questions or issues, please open an issue on GitHub.
-
 ---
 
 **Happy Trading! 🚀**
+
 
