@@ -1,0 +1,106 @@
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:16
+    container_name: tradingbot_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tradingbot_test}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-tradingbot_test} || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    networks:
+      - tradingbot-network
+
+  # Main Trading Bot Application
+  tradingbot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: crypto_trading_bot_app
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-tradingbot_test}
+    ports:
+      - "8000:8000"  # FastAPI
+      - "8501:8501"  # Streamlit
+      - "5000:5000"  # MLflow
+    volumes:
+      - ./src:/app/src:cached
+      - ./main.py:/app/main.py:cached
+      - ./data:/app/data:cached
+      - ./logs:/app/logs
+      - ./models:/app/models
+      - .env:/app/.env:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    command: >
+      sh -c "python check_db_connection.py && python main.py"
+    networks:
+      - tradingbot-network
+
+  # Streamlit Dashboard
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tradingbot_streamlit
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-tradingbot_test}
+    ports:
+      - "8502:8501"
+    volumes:
+      - ./src:/app/src:cached
+      - ./data:/app/data:cached
+      - ./models:/app/models:cached
+      - .env:/app/.env:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    command: >
+      sh -c "streamlit run src/streamlit_app.py --server.port 8501 --server.address 0.0.0.0"
+    networks:
+      - tradingbot-network
+
+  # Bot Worker (separate process for trading logic)
+  bot-worker:
+    build: .
+    container_name: tradingbot_worker
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-tradingbot_test}
+    volumes:
+      - ./src:/app/src:cached
+      - ./logs:/app/logs
+      - ./models:/app/models
+      - .env:/app/.env:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    command: >
+      sh -c "python check_db_connection.py && python src/bot_runner.py"
+    networks:
+      - tradingbot-network
+
+volumes:
+  postgres_data:
+
+networks:
+  tradingbot-network:
+    driver: bridge
